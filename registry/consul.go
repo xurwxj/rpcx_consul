@@ -48,6 +48,7 @@ func (p *ConsulRegisterPlugin) Start() error {
 	}
 	p.Client = client
 	p.namingClient = client.Agent()
+	// client.Catalog().Register(&api.CatalogRegistration{})
 
 	return nil
 }

@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/hashicorp/consul/api"
@@ -68,27 +69,44 @@ func NewConsulDiscoveryWithClient(servicePath, env, tag string, client *api.Clie
 }
 
 func (d *ConsulDiscovery) fetch() {
-	services, _, err := d.Client.Health().Service(d.servicePath, d.tag, true, nil)
+	// var lastIndex uint64
+	// services, metainfo, err := d.Client.Health().Service(d.servicePath, d.tag, true, &api.QueryOptions{
+	// 	WaitIndex: lastIndex,
+	// })
+	_, services, err := d.Client.Agent().AgentHealthServiceByName(d.servicePath)
 	if err != nil {
 		log.Errorf("failed to get service %s: %v", d.servicePath, err)
 		return
 	}
+	// lastIndex = metainfo.LastIndex
 	pairs := make([]*client.KVPair, 0, len(services))
 	for _, inst := range services {
-		network := inst.Service.Meta["network"]
-		ip := inst.Service.Address
-		port := inst.Service.Port
-		key := fmt.Sprintf("%s@%s:%d", network, ip, port)
-		pair := &client.KVPair{Key: key, Value: util.ConvertMap2String(inst.Service.Meta)}
-		if d.filter != nil && !d.filter(pair) {
-			continue
+		if FindInStringSlice(inst.Service.Tags, d.env) && inst.AggregatedStatus == "passing" {
+			network := inst.Service.Meta["network"]
+			ip := inst.Service.Address
+			port := inst.Service.Port
+			key := fmt.Sprintf("%s@%s:%d", network, ip, port)
+			pair := &client.KVPair{Key: key, Value: util.ConvertMap2String(inst.Service.Meta)}
+			if d.filter != nil && !d.filter(pair) {
+				continue
+			}
+			pairs = append(pairs, pair)
 		}
-		pairs = append(pairs, pair)
 	}
 
 	d.pairsMu.Lock()
-	// d.pairs = pairs
+	d.pairs = pairs
 	d.pairsMu.Unlock()
+}
+
+// FindInStringSlice find string in slice
+func FindInStringSlice(s []string, t string) bool {
+	for _, v := range s {
+		if strings.TrimSpace(v) == strings.TrimSpace(t) {
+			return true
+		}
+	}
+	return false
 }
 
 // Clone clones this ServiceDiscovery with new servicePath.
