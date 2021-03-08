@@ -48,7 +48,7 @@ func main() {
 	fmt.Println("rs: ", rs)
 	fmt.Println("siii: ", siii)
 	for _, k := range siii {
-		if discovery.FindInStringSlice(k.Service.Tags, "dev") {
+		if discovery.FindInStringSlice(k.Service.Tags, "dev") && k.AggregatedStatus == "passing" {
 			fmt.Println("k", k.Service.Service)
 			fmt.Println("k", k.Service.Address)
 			fmt.Println("k", k.Service.Port)
