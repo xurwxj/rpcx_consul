@@ -14,6 +14,13 @@ import (
 type ConsulRegisterPlugin struct {
 	// service address, for example, tcp@127.0.0.1:8972, quic@127.0.0.1:1234
 	ServiceAddress string
+
+	// consul client config Datacenter
+	Datacenter string
+	// consul server token
+	Token string
+	// consul server address, multi seperated by comma
+	ConsulServers string
 	// Consul client config
 	ClientConfig *api.Config
 
@@ -26,8 +33,8 @@ type ConsulRegisterPlugin struct {
 	Tags     []string
 	ENV      string
 
-	namingClient *api.Agent
-	Client       *api.Client
+	namingClients []*api.Agent
+	Clients       []*api.Client
 
 	dying chan struct{}
 	done  chan struct{}
@@ -41,13 +48,24 @@ func (p *ConsulRegisterPlugin) Start() error {
 	if p.dying == nil {
 		p.dying = make(chan struct{})
 	}
-
-	client, err := api.NewClient(p.ClientConfig)
-	if err != nil {
-		return err
+	scStrs := strings.Split(strings.TrimSpace(p.ConsulServers), ",")
+	if len(scStrs) < 1 {
+		return fmt.Errorf("noServerConfig")
 	}
-	p.Client = client
-	p.namingClient = client.Agent()
+	conf := api.DefaultConfig()
+	conf.Datacenter = p.Datacenter
+	conf.Token = p.Token
+	for _, cs := range scStrs {
+		conf.Address = strings.TrimSpace(cs)
+		client, err := api.NewClient(conf)
+		if err != nil {
+			log.Errorf("ConsulRegisterPlugin:NewClient:err: %v on server: %s", err, cs)
+			continue
+		}
+		log.Debugf("ConsulRegisterPlugin:NewClient:server: %s", cs)
+		p.namingClients = append(p.namingClients, client.Agent())
+		p.Clients = append(p.Clients, client)
+	}
 	// client.Catalog().Register(&api.CatalogRegistration{})
 
 	return nil
@@ -57,9 +75,11 @@ func (p *ConsulRegisterPlugin) Start() error {
 func (p *ConsulRegisterPlugin) Stop() error {
 
 	for _, name := range p.Services {
-		err := p.namingClient.ServiceDeregister(name)
-		if err != nil {
-			log.Errorf("Stop:ServiceDeregister:%v, with name: %s", err, name)
+		for _, nc := range p.namingClients {
+			err := nc.ServiceDeregister(name)
+			if err != nil {
+				log.Errorf("Stop:ServiceDeregister:%v, with name: %s", err, name)
+			}
 		}
 	}
 
@@ -99,9 +119,18 @@ func (p *ConsulRegisterPlugin) Register(name string, rcvr interface{}, metadata 
 			DeregisterCriticalServiceAfter: fmt.Sprintf("%vs", p.ListenIntervalMs),
 		},
 	}
-
-	err = p.namingClient.ServiceRegister(inst)
-	if err != nil {
+	done := false
+	for _, nc := range p.namingClients {
+		err = nc.ServiceRegister(inst)
+		ncn, _ := nc.NodeName()
+		if err == nil {
+			log.Debugf("ConsulRegisterPlugin:NewClient:server: %s:service:%s", ncn, inst.Name)
+			done = true
+		} else {
+			log.Errorf("ConsulRegisterPlugin:NewClient:server: %s:service:%s:err:%v", ncn, inst.Name, err)
+		}
+	}
+	if err != nil && !done {
 		return err
 	}
 
@@ -129,8 +158,14 @@ func (p *ConsulRegisterPlugin) Unregister(name string) (err error) {
 	// if err != nil {
 	// 	return err
 	// }
-	err = p.namingClient.ServiceDeregister(name)
-	if err != nil {
+	done := false
+	for _, nc := range p.namingClients {
+		err = nc.ServiceDeregister(name)
+		if err == nil {
+			done = true
+		}
+	}
+	if err != nil && !done {
 		return err
 	}
 
