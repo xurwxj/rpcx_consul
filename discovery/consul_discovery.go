@@ -9,6 +9,7 @@ import (
 	"github.com/smallnest/rpcx/client"
 	"github.com/smallnest/rpcx/log"
 	"github.com/smallnest/rpcx/util"
+	rclient "github.com/xurwxj/rpcx_consul/client"
 )
 
 // ConsulDiscovery is a consul service discovery.
@@ -34,7 +35,27 @@ type ConsulDiscovery struct {
 }
 
 // NewConsulDiscovery returns a new ConsulDiscovery.
-func NewConsulDiscovery(servicePath, env, tag string, clientConfig *api.Config) (client.ServiceDiscovery, error) {
+func NewConsulDiscovery(servicePath, env, tag, consulServers, token, datacenter string) (client.ServiceDiscovery, error) {
+	client, clientConfig, err := rclient.ConsulClientConfig(consulServers, datacenter, token)
+	if err != nil {
+		return nil, err
+	}
+	d := &ConsulDiscovery{
+		servicePath:  servicePath,
+		env:          env,
+		tag:          tag,
+		clientConfig: clientConfig,
+	}
+
+	d.Client = client
+
+	d.fetch()
+	go d.watch()
+	return d, nil
+}
+
+// NewConsulDiscoveryWithConfig returns a new ConsulDiscovery.
+func NewConsulDiscoveryWithConfig(servicePath, env, tag string, clientConfig *api.Config) (client.ServiceDiscovery, error) {
 	d := &ConsulDiscovery{
 		servicePath:  servicePath,
 		env:          env,
@@ -111,7 +132,7 @@ func FindInStringSlice(s []string, t string) bool {
 
 // Clone clones this ServiceDiscovery with new servicePath.
 func (d *ConsulDiscovery) Clone(servicePath string) (client.ServiceDiscovery, error) {
-	return NewConsulDiscovery(servicePath, d.env, d.tag, d.clientConfig)
+	return NewConsulDiscoveryWithConfig(servicePath, d.env, d.tag, d.clientConfig)
 }
 
 // SetFilter sets the filer.
