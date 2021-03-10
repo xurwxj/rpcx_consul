@@ -94,7 +94,7 @@ func (d *ConsulDiscovery) fetch() {
 	// services, metainfo, err := d.Client.Health().Service(d.servicePath, d.tag, true, &api.QueryOptions{
 	// 	WaitIndex: lastIndex,
 	// })
-	_, services, err := d.Client.Agent().AgentHealthServiceByName(d.servicePath)
+	status, services, err := d.Client.Agent().AgentHealthServiceByName(d.servicePath)
 	if err != nil {
 		log.Errorf("failed to get service %s: %v", d.servicePath, err)
 		return
@@ -102,7 +102,7 @@ func (d *ConsulDiscovery) fetch() {
 	// lastIndex = metainfo.LastIndex
 	pairs := make([]*client.KVPair, 0, len(services))
 	for _, inst := range services {
-		if FindInStringSlice(inst.Service.Tags, d.env) && inst.AggregatedStatus == "passing" {
+		if FindInStringSlice(inst.Service.Tags, d.env) && status == "passing" {
 			network := inst.Service.Meta["network"]
 			ip := inst.Service.Address
 			port := inst.Service.Port
