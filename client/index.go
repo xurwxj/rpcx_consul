@@ -29,6 +29,16 @@ func ConsulClient(serverStrs, datacenter, token string) (client *api.Client, err
 	return
 }
 
+// FilterServices filter services by filter
+func FilterServices(serverStrs, datacenter, token, filter string) (services map[string]*api.AgentService, err error) {
+	client, err := ConsulClient(serverStrs, datacenter, token)
+	if err != nil {
+		return
+	}
+	services, err = client.Agent().ServicesWithFilter(filter)
+	return
+}
+
 // ConsulClientConfig get consul client by config params
 func ConsulClientConfig(serverStrs, datacenter, token string) (client *api.Client, conf *api.Config, err error) {
 	scStrs := strings.Split(strings.TrimSpace(serverStrs), ",")
