@@ -3,11 +3,14 @@ package registry
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/smallnest/rpcx/log"
 	"github.com/smallnest/rpcx/util"
+	"github.com/xurwxj/gtils/base"
 )
 
 // ConsulRegisterPlugin implements consul registry.
@@ -15,6 +18,9 @@ type ConsulRegisterPlugin struct {
 	// service address, for example, tcp@127.0.0.1:8972, quic@127.0.0.1:1234
 	ServiceAddress string
 
+	HealthType string
+
+	HttpHealthPort string
 	// consul client config Datacenter
 	Datacenter string
 	// consul server token
@@ -48,6 +54,40 @@ func (p *ConsulRegisterPlugin) Start() error {
 	if p.dying == nil {
 		p.dying = make(chan struct{})
 	}
+	if p.HealthType == "" {
+		p.HealthType = "tcp"
+	}
+	if p.HealthType == "http" && p.HttpHealthPort != "" {
+		_, ip, _, err := util.ParseRpcxAddress(p.ServiceAddress)
+		if err != nil {
+			return err
+		}
+		server := &http.Server{
+			Addr:         fmt.Sprintf("%s:%s", ip, p.HttpHealthPort),
+			ReadTimeout:  10 * time.Second,
+			WriteTimeout: 10 * time.Second,
+		}
+		mux := http.NewServeMux()
+		mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			serviceName := r.URL.Query().Get("service")
+			if serviceName != "" && checkServiceExist(serviceName, p) {
+				resByte, err := base.GetByteArrayFromInterface(map[string]interface{}{
+					"status": "UP",
+					"application": map[string]string{
+						"status": "UP",
+					},
+				})
+				if err == nil {
+					_, err = w.Write(resByte)
+					if err == nil {
+						return
+					}
+				}
+			}
+			w.Write([]byte("fail"))
+		})
+		server.Handler = mux
+	}
 	scStrs := strings.Split(strings.TrimSpace(p.ConsulServers), ",")
 	if len(scStrs) < 1 {
 		return fmt.Errorf("noServerConfig")
@@ -69,6 +109,15 @@ func (p *ConsulRegisterPlugin) Start() error {
 	// client.Catalog().Register(&api.CatalogRegistration{})
 
 	return nil
+}
+
+func checkServiceExist(serviceName string, p *ConsulRegisterPlugin) (rs bool) {
+	for _, s := range p.Services {
+		if s == serviceName {
+			rs = true
+		}
+	}
+	return
 }
 
 // Stop unregister all services.
@@ -105,6 +154,18 @@ func (p *ConsulRegisterPlugin) Register(name string, rcvr interface{}, metadata 
 	meta["network"] = network
 	meta["env"] = p.ENV
 
+	healthCheck := api.AgentServiceCheck{
+		Timeout:                        fmt.Sprintf("%vs", p.Timeout),
+		Interval:                       fmt.Sprintf("%vs", p.BeatIntervalMs),
+		DeregisterCriticalServiceAfter: fmt.Sprintf("%vs", p.ListenIntervalMs),
+	}
+	if p.HealthType == "tcp" {
+		healthCheck.TCP = fmt.Sprintf("%s:%v", ip, port)
+	}
+	if p.HealthType == "http" && p.HttpHealthPort != "" {
+		healthCheck.HTTP = fmt.Sprintf("http://%s:%s/health?service=%s", ip, p.HttpHealthPort, name)
+	}
+
 	inst := &api.AgentServiceRegistration{
 		Name:    name,
 		ID:      fmt.Sprintf("%s_%s_%v", name, ip, port),
@@ -112,12 +173,7 @@ func (p *ConsulRegisterPlugin) Register(name string, rcvr interface{}, metadata 
 		Tags:    p.Tags,
 		Address: ip,
 		Meta:    meta,
-		Check: &api.AgentServiceCheck{
-			TCP:                            fmt.Sprintf("%s:%v", ip, port),
-			Timeout:                        fmt.Sprintf("%vs", p.Timeout),
-			Interval:                       fmt.Sprintf("%vs", p.BeatIntervalMs),
-			DeregisterCriticalServiceAfter: fmt.Sprintf("%vs", p.ListenIntervalMs),
-		},
+		Check:   &healthCheck,
 	}
 	done := false
 	for _, nc := range p.namingClients {
