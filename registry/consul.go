@@ -84,6 +84,7 @@ func (p *ConsulRegisterPlugin) Start() error {
 					}
 				}
 			}
+			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("fail"))
 		})
 		server.Handler = mux
