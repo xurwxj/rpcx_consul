@@ -87,6 +87,13 @@ func (p *ConsulRegisterPlugin) Start() error {
 			w.Write([]byte("fail"))
 		})
 		server.Handler = mux
+		go func() {
+			fmt.Println("http start...")
+			err := server.ListenAndServe()
+			if err != nil {
+				fmt.Println("http: ", err)
+			}
+		}()
 	}
 	scStrs := strings.Split(strings.TrimSpace(p.ConsulServers), ",")
 	if len(scStrs) < 1 {
