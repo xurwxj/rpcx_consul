@@ -33,6 +33,7 @@ type ConsulRegisterPlugin struct {
 	Timeout          uint64
 	ListenIntervalMs uint64
 	BeatIntervalMs   int64
+	Log              log.Logger
 
 	// Registered services
 	Services []string
@@ -48,6 +49,7 @@ type ConsulRegisterPlugin struct {
 
 // Start starts to connect consul cluster
 func (p *ConsulRegisterPlugin) Start() error {
+	log.SetLogger(p.Log)
 	if p.done == nil {
 		p.done = make(chan struct{})
 	}
