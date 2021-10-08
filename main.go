@@ -10,8 +10,8 @@ import (
 
 func main() {
 	conf := api.DefaultConfig()
-	conf.Address = "10.10.1.58:8500"
-	conf.Token = "1c67c216-a4ec-2235-da71-ad5d3f970280"
+	conf.Address = "127.0.0.1:8500"
+	conf.Token = "fb3f1ee7-26d5-abf7-613c-0691d384cfe6"
 	client, err := api.NewClient(conf)
 	if err != nil {
 		fmt.Println("client err: ", err)
@@ -32,7 +32,7 @@ func main() {
 	fmt.Println(time.Now())
 
 	var lastIndex uint64
-	ssss, smi, err := client.Catalog().Service("com.shining3d.app.auth.audit", "dev", &api.QueryOptions{
+	ssss, smi, err := client.Catalog().Service("com.shining3d.app.auth.audit", "dev1", &api.QueryOptions{
 		WaitIndex: lastIndex,
 	})
 	if err != nil {
