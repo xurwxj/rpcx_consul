@@ -3,6 +3,7 @@ package registry
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -122,12 +123,20 @@ func (p *ConsulRegisterPlugin) Start() error {
 }
 
 func checkServiceExist(serviceName string, p *ConsulRegisterPlugin) (rs bool) {
-	for _, s := range p.Services {
-		if s == serviceName {
-			rs = true
+	// //test
+	rs = true
+	if serviceName == "com.shining3d.sm.log" {
+		if rand.Intn(2) == 1 {
+			rs = false
 		}
 	}
 	return
+	// for _, s := range p.Services {
+	// 	if s == serviceName {
+	// 		rs = true
+	// 	}
+	// }
+	// return
 }
 
 // Stop unregister all services.
