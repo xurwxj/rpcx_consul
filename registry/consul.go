@@ -4,14 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"net"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/smallnest/rpcx/log"
 	"github.com/smallnest/rpcx/util"
-	"github.com/xurwxj/gtils/base"
+	"github.com/soheilhy/cmux"
 )
 
 // ConsulRegisterPlugin implements consul registry.
@@ -49,7 +49,7 @@ type ConsulRegisterPlugin struct {
 }
 
 // Start starts to connect consul cluster
-func (p *ConsulRegisterPlugin) Start() error {
+func (p *ConsulRegisterPlugin) Start(l net.Listener) error {
 	log.SetLogger(p.Log)
 	if p.done == nil {
 		p.done = make(chan struct{})
@@ -61,43 +61,51 @@ func (p *ConsulRegisterPlugin) Start() error {
 		p.HealthType = "tcp"
 	}
 	if p.HealthType == "http" && p.HttpHealthPort != "" {
-		_, ip, _, err := util.ParseRpcxAddress(p.ServiceAddress)
-		if err != nil {
-			return err
-		}
-		server := &http.Server{
-			Addr:         fmt.Sprintf("%s:%s", ip, p.HttpHealthPort),
-			ReadTimeout:  10 * time.Second,
-			WriteTimeout: 10 * time.Second,
-		}
-		mux := http.NewServeMux()
-		mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-			serviceName := r.URL.Query().Get("service")
-			if serviceName != "" && checkServiceExist(serviceName, p) {
-				resByte, err := base.GetByteArrayFromInterface(map[string]interface{}{
-					"status": "UP",
-					"application": map[string]string{
-						"status": "UP",
-					},
-				})
-				if err == nil {
-					_, err = w.Write(resByte)
-					if err == nil {
-						return
-					}
-				}
-			}
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("fail"))
-		})
-		server.Handler = mux
-		go func() {
-			fmt.Println("http start...")
-			err := server.ListenAndServe()
-			if err != nil {
-				fmt.Println("http: ", err)
-			}
-		}()
+		// _, ip, _, err := util.ParseRpcxAddress(p.ServiceAddress)
+		// if err != nil {
+		// 	return err
+		// }
+		// server := &http.Server{
+		// 	Addr:         fmt.Sprintf("%s:%s", ip, p.HttpHealthPort),
+		// 	ReadTimeout:  10 * time.Second,
+		// 	WriteTimeout: 10 * time.Second,
+		// }
+		// mux := http.NewServeMux()
+		m := cmux.New(l)
+		fmt.Println("m ....", m)
+		httpL := m.Match(cmux.HTTP1Fast())
+		httpS := &http.Server{}
+		go httpS.Serve(httpL)
+		err := m.Serve()
+		fmt.Println("m serve....", err)
+		// mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		// 	serviceName := r.URL.Query().Get("service")
+		// 	if serviceName != "" && checkServiceExist(serviceName, p) {
+		// 		resByte, err := base.GetByteArrayFromInterface(map[string]interface{}{
+		// 			"status": "UP",
+		// 			"application": map[string]string{
+		// 				"status": "UP",
+		// 			},
+		// 		})
+		// 		if err == nil {
+		// 			_, err = w.Write(resByte)
+		// 			if err == nil {
+		// 				return
+		// 			}
+		// 		}
+		// 	}
+		// 	w.WriteHeader(http.StatusBadRequest)
+		// 	w.Write([]byte("fail"))
+		// })
+		// server = mux
+		// server.Handler = mux
+		// go func() {
+		// 	fmt.Println("http start...")
+		// 	err := server.ListenAndServe()
+		// 	if err != nil {
+		// 		fmt.Println("http: ", err)
+		// 	}
+		// }()
 	}
 	scStrs := strings.Split(strings.TrimSpace(p.ConsulServers), ",")
 	if len(scStrs) < 1 {
