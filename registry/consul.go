@@ -3,14 +3,11 @@ package registry
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/smallnest/rpcx/log"
 	"github.com/smallnest/rpcx/util"
-	"github.com/xurwxj/gtils/base"
 )
 
 // ConsulRegisterPlugin implements consul registry.
@@ -20,7 +17,6 @@ type ConsulRegisterPlugin struct {
 
 	HealthType string
 
-	HttpHealthPort string
 	// consul client config Datacenter
 	Datacenter string
 	// consul server token
@@ -57,46 +53,7 @@ func (p *ConsulRegisterPlugin) Start() error {
 		p.dying = make(chan struct{})
 	}
 	if p.HealthType == "" {
-		p.HealthType = "tcp"
-	}
-	if p.HealthType == "http" && p.HttpHealthPort != "" {
-		_, ip, _, err := util.ParseRpcxAddress(p.ServiceAddress)
-		if err != nil {
-			return err
-		}
-		server := &http.Server{
-			Addr:         fmt.Sprintf("%s:%s", ip, p.HttpHealthPort),
-			ReadTimeout:  10 * time.Second,
-			WriteTimeout: 10 * time.Second,
-		}
-		mux := http.NewServeMux()
-		mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-			serviceName := r.URL.Query().Get("service")
-			if serviceName != "" && checkServiceExist(serviceName, p) {
-				resByte, err := base.GetByteArrayFromInterface(map[string]interface{}{
-					"status": "UP",
-					"application": map[string]string{
-						"status": "UP",
-					},
-				})
-				if err == nil {
-					_, err = w.Write(resByte)
-					if err == nil {
-						return
-					}
-				}
-			}
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("fail"))
-		})
-		server.Handler = mux
-		go func() {
-			fmt.Println("http start...")
-			err := server.ListenAndServe()
-			if err != nil {
-				fmt.Println("http: ", err)
-			}
-		}()
+		p.HealthType = "http"
 	}
 	scStrs := strings.Split(strings.TrimSpace(p.ConsulServers), ",")
 	if len(scStrs) < 1 {
@@ -104,30 +61,23 @@ func (p *ConsulRegisterPlugin) Start() error {
 	}
 	conf := api.DefaultConfig()
 	conf.Datacenter = p.Datacenter
-	conf.Token = p.Token
+	if p.Token != "" {
+		conf.Token = p.Token
+	}
 	for _, cs := range scStrs {
 		conf.Address = strings.TrimSpace(cs)
 		client, err := api.NewClient(conf)
 		if err != nil {
-			log.Errorf("ConsulRegisterPlugin:NewClient:err: %v on server: %s", err, cs)
+			log.Errorf("ConsulRegisterPlugin:Start:NewClient:err: %v on server: %s", err, cs)
 			continue
 		}
-		log.Debugf("ConsulRegisterPlugin:NewClient:server: %s", cs)
+		log.Debugf("ConsulRegisterPlugin:Start:NewClient:server: %s", cs)
 		p.namingClients = append(p.namingClients, client.Agent())
 		p.Clients = append(p.Clients, client)
 	}
 	// client.Catalog().Register(&api.CatalogRegistration{})
 
 	return nil
-}
-
-func checkServiceExist(serviceName string, p *ConsulRegisterPlugin) (rs bool) {
-	for _, s := range p.Services {
-		if s == serviceName {
-			rs = true
-		}
-	}
-	return
 }
 
 // Stop unregister all services.
@@ -172,8 +122,14 @@ func (p *ConsulRegisterPlugin) Register(name string, rcvr interface{}, metadata 
 	if p.HealthType == "tcp" {
 		healthCheck.TCP = fmt.Sprintf("%s:%v", ip, port)
 	}
-	if p.HealthType == "http" && p.HttpHealthPort != "" {
-		healthCheck.HTTP = fmt.Sprintf("http://%s:%s/health?service=%s", ip, p.HttpHealthPort, name)
+	if p.HealthType == "http" {
+		healthCheck.HTTP = fmt.Sprintf("http://%s:%v/health?service=%s", ip, port, name)
+		headerVal := []string{"serviceCheck"}
+		healthCheck.Header = map[string][]string{
+			"Consul-Health-Check": headerVal,
+		}
+		healthCheck.Method = "POST"
+		healthCheck.Body = metadata
 	}
 
 	inst := &api.AgentServiceRegistration{
@@ -190,10 +146,10 @@ func (p *ConsulRegisterPlugin) Register(name string, rcvr interface{}, metadata 
 		err = nc.ServiceRegister(inst)
 		ncn, _ := nc.NodeName()
 		if err == nil {
-			log.Debugf("ConsulRegisterPlugin:NewClient:server: %s:service:%s", ncn, inst.Name)
+			log.Debugf("ConsulRegisterPlugin:Register:ServiceRegister: %s:service:%s", ncn, inst.Name)
 			done = true
 		} else {
-			log.Errorf("ConsulRegisterPlugin:NewClient:server: %s:service:%s:err:%v", ncn, inst.Name, err)
+			log.Errorf("ConsulRegisterPlugin:Register:ServiceRegister: %s:service:%s:err:%v", ncn, inst.Name, err)
 		}
 	}
 	if err != nil && !done {
