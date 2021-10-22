@@ -46,8 +46,9 @@ func (s *CmuxPlugin) MuxMatch(m cmux.CMux) {
 		Handler: mux,
 	}
 	go httpS.Serve(listener)
-	err := m.Serve()
-	if err != nil {
-		s.Log.Errorf("MuxMatch Serve err: ", err)
-	}
+	// go m.Serve()
+	// err := m.Serve()
+	// if err != nil {
+	// 	s.Log.Errorf("MuxMatch Serve err: ", err)
+	// }
 }
