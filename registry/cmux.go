@@ -16,10 +16,10 @@ type CmuxPlugin struct {
 
 // MuxMatch main CMuxMatch func
 func (s *CmuxPlugin) MuxMatch(m cmux.CMux) {
-	http1Matcher := cmux.HTTP1HeaderFieldPrefix("Consul-Health-Check", "service")
-	http1aMatcher := cmux.HTTP1HeaderFieldPrefix("Consul-Health-Check", "[")
-	http2Matcher := cmux.HTTP2HeaderFieldPrefix("Consul-Health-Check", "service-")
-	http2aMatcher := cmux.HTTP2HeaderFieldPrefix("Consul-Health-Check", "[")
+	http1Matcher := cmux.HTTP1HeaderFieldPrefix("Consul-Health-Check", "serviceCheck")
+	http1aMatcher := cmux.HTTP1HeaderFieldPrefix("Consul-Health-Check", "[\"serviceCheck")
+	http2Matcher := cmux.HTTP2HeaderFieldPrefix("Consul-Health-Check", "serviceCheck")
+	http2aMatcher := cmux.HTTP2HeaderFieldPrefix("Consul-Health-Check", "[\"serviceCheck")
 	listener := m.Match(http1Matcher, http1aMatcher, http2Matcher, http2aMatcher)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
