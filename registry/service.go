@@ -47,7 +47,7 @@ type ServiceFuncMeta struct {
 	// name: 服务或接口唯一名，用英文，一般用于外部接入时避免网址写死，会在cdn的json作为key
 	URLName string `json:"name,omitempty"`
 	// funcName: 方法函数名
-	FuncName string `json:"funcName"`
+	FuncName string `json:"funcName,omitempty"`
 	// http路径，注意如果重复，则重复的这些服务只有1个有效，无序
 	URLPath    string `json:"path,omitempty"`
 	HTTPMethod string `json:"method,omitempty"`
