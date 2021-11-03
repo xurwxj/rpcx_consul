@@ -1,15 +1,17 @@
 package registry
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"os"
 
 	"github.com/smallnest/rpcx/log"
 	"github.com/soheilhy/cmux"
 	"github.com/xurwxj/gtils/base"
-	"github.com/xurwxj/rpcx_consul/remoteconfig"
+	"github.com/xurwxj/viper"
 )
 
 type CmuxPluginConfig struct {
@@ -41,7 +43,7 @@ func (s *CmuxPluginConfig) MuxMatch(m cmux.CMux) {
 		if len(c) > 0 {
 			v := c[0].Value
 			newValue, _ := base64.StdEncoding.DecodeString(v)
-			remoteconfig.MergeConfig(string(newValue))
+			MergeConfig(string(newValue))
 			log.Debugf("consulConfigUpdate kvKey=%v  value=%v ", c[0].Key, string(newValue))
 		}
 		resByte, err := base.GetByteArrayFromInterface(map[string]interface{}{
@@ -62,4 +64,21 @@ func (s *CmuxPluginConfig) MuxMatch(m cmux.CMux) {
 		Handler: mux,
 	}
 	go httpS.Serve(listener)
+}
+
+func MergeConfig(data string) {
+	if data == "" {
+		return
+	}
+	base.CheckPathExistOrCreate("nacos")
+	err := os.WriteFile("nacos/remote.json", []byte(data), os.ModePerm)
+	if err != nil {
+		log.Errorf("mergeConfig:WriteFile config=%v err=%v ", data, err)
+	}
+	err = viper.MergeConfig(bytes.NewReader([]byte(data)))
+	if err != nil {
+		log.Errorf("mergeConfig config=%v  err=%v ", data, err)
+	} else {
+		log.Infof("mergeConfig done success ")
+	}
 }
