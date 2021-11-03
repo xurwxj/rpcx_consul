@@ -8,4 +8,5 @@ require (
 	github.com/smallnest/rpcx v1.6.11
 	github.com/soheilhy/cmux v0.1.4
 	github.com/xurwxj/gtils v1.0.1
+	github.com/xurwxj/viper v1.7.1
 )
