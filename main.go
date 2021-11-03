@@ -1,13 +1,41 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"net/http"
 
+	"github.com/xurwxj/rpcx_consul/demo"
 	"github.com/xurwxj/rpcx_consul/registry"
 )
 
+func IndexHandler(w http.ResponseWriter, r *http.Request) {
+	buf := make([]byte, 0)
+	fmt.Println(r.Body.Read(buf))
+	fmt.Println(buf)
+
+	fmt.Fprintln(w, "hello world")
+}
+
+func test() {
+	a := "eyJzdHUiOjMsInNzc3MiOiJxaGhoaCIsInNza2siOjExMn0="
+	bb, err := base64.StdEncoding.DecodeString(a)
+	// b := bytes.Buffer{}
+	// bb := []byte(a) s
+	var entryInfos map[string]interface{}
+	// c := json.NewDecoder(&b)
+	// _,err := c.Buffered().Read(&a)
+	json.Unmarshal([]byte(bb), &entryInfos)
+	fmt.Println("...", err, entryInfos)
+
+}
 func main() {
-	doServiceConvert()
+	// test()
+	// return
+	demo.InitLog()
+	demo.InitRegistry()
+	// doServiceConvert()
 	// conf := api.DefaultConfig()
 	// conf.Address = "10.10.1.58:8500"
 	// conf.Token = "1c67c216-a4ec-2235-da71-ad5d3f970280"

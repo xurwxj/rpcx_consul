@@ -3,7 +3,6 @@ package registry
 import (
 	"errors"
 	"fmt"
-	"net"
 	"strings"
 
 	"github.com/hashicorp/consul/api"
@@ -45,8 +44,7 @@ type ConsulRegisterPlugin struct {
 }
 
 // Start starts to connect consul cluster
-func (p *ConsulRegisterPlugin) Start(l net.Listener) error {
-	log.SetLogger(p.Log)
+func (p *ConsulRegisterPlugin) Start() error {
 	if p.done == nil {
 		p.done = make(chan struct{})
 	}
@@ -65,14 +63,15 @@ func (p *ConsulRegisterPlugin) Start(l net.Listener) error {
 	if p.Token != "" {
 		conf.Token = p.Token
 	}
+
 	for _, cs := range scStrs {
 		conf.Address = strings.TrimSpace(cs)
 		client, err := api.NewClient(conf)
 		if err != nil {
-			log.Errorf("ConsulRegisterPlugin:Start:NewClient:err: %v on server: %s", err, cs)
+			fmt.Println("ConsulRegisterPlugin:Start:NewClient:err:  on server: ", err, cs)
 			continue
 		}
-		log.Debugf("ConsulRegisterPlugin:Start:NewClient:server: %s", cs)
+		fmt.Println("ConsulRegisterPlugin:Start:NewClient:server: ", cs)
 		p.namingClients = append(p.namingClients, client.Agent())
 		p.Clients = append(p.Clients, client)
 	}
@@ -88,7 +87,7 @@ func (p *ConsulRegisterPlugin) Stop() error {
 		for _, nc := range p.namingClients {
 			err := nc.ServiceDeregister(name)
 			if err != nil {
-				log.Errorf("Stop:ServiceDeregister:%v, with name: %s", err, name)
+				fmt.Println("Stop:ServiceDeregister: with name: ", err, name)
 			}
 		}
 	}
@@ -147,10 +146,10 @@ func (p *ConsulRegisterPlugin) Register(name string, rcvr interface{}, metadata 
 		err = nc.ServiceRegister(inst)
 		ncn, _ := nc.NodeName()
 		if err == nil {
-			log.Debugf("ConsulRegisterPlugin:Register:ServiceRegister: %s:service:%s", ncn, inst.Name)
+			fmt.Println("ConsulRegisterPlugin:Register:ServiceRegister: %s:service:%s", ncn, inst.Name)
 			done = true
 		} else {
-			log.Errorf("ConsulRegisterPlugin:Register:ServiceRegister: %s:service:%s:err:%v", ncn, inst.Name, err)
+			fmt.Println("ConsulRegisterPlugin:Register:ServiceRegister: %s:service:%s:err:%v", ncn, inst.Name, err)
 		}
 	}
 	if err != nil && !done {

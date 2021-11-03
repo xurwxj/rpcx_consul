@@ -7,7 +7,6 @@ import (
 
 	"github.com/hashicorp/consul/api"
 	"github.com/smallnest/rpcx/client"
-	"github.com/smallnest/rpcx/log"
 	"github.com/smallnest/rpcx/util"
 	rclient "github.com/xurwxj/rpcx_consul/client"
 )
@@ -96,7 +95,7 @@ func (d *ConsulDiscovery) fetch() {
 	// })
 	status, services, err := d.Client.Agent().AgentHealthServiceByName(d.servicePath)
 	if err != nil {
-		log.Errorf("failed to get service %s: %v", d.servicePath, err)
+		fmt.Println("failed to get service %s: %v", d.servicePath, err)
 		return
 	}
 	// lastIndex = metainfo.LastIndex

@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/smallnest/rpcx/log"
@@ -20,11 +21,12 @@ func (s *CmuxPlugin) MuxMatch(m cmux.CMux) {
 	http1aMatcher := cmux.HTTP1HeaderFieldPrefix("Consul-Health-Check", "[\"serviceCheck")
 	http2Matcher := cmux.HTTP2HeaderFieldPrefix("Consul-Health-Check", "serviceCheck")
 	http2aMatcher := cmux.HTTP2HeaderFieldPrefix("Consul-Health-Check", "[\"serviceCheck")
+
 	listener := m.Match(http1Matcher, http1aMatcher, http2Matcher, http2aMatcher)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		serviceName := r.URL.Query().Get("service")
-		// fmt.Println(serviceName)
+		fmt.Println("xxxx", serviceName)
 		if base.FindInStringSlice(*s.Services, serviceName) {
 			resByte, err := base.GetByteArrayFromInterface(map[string]interface{}{
 				"status": "UP",
