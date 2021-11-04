@@ -56,7 +56,7 @@ func InitRegistry() {
 	addConsulCmuxPlugin()
 
 	// go common.CallInitPermService()
-	serviceAddr := "10.20.31.17:6974"
+	serviceAddr := "10.20.31.17:6975"
 	fmt.Println(time.Now().UTC().String(), "starting registry server on ", serviceAddr)
 	if err := s.Serve("tcp", serviceAddr); err != nil {
 		fmt.Println("..", err, serviceAddr)
@@ -73,7 +73,7 @@ func CloseRemoteRegistry() {
 func addConsulRegistryPlugins() {
 	fmt.Println("starting add consul registry plugin...")
 
-	serviceAddr := "10.20.31.17:6974"
+	serviceAddr := "10.20.31.17:6975"
 
 	if timeoutMs == 0 {
 		timeoutMs = 3000

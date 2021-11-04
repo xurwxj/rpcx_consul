@@ -3,7 +3,6 @@ package demo
 import (
 	"context"
 
-	"git.shining3d.com/cloud/util/service"
 	"github.com/xurwxj/rpcx_consul/registry"
 )
 
@@ -18,12 +17,12 @@ var serviceFuncs = []registry.ServiceFuncItem{
 	// }),
 }
 
-func SoftModularUse(ctx context.Context, args *service.Args, reply *service.Replies) error {
+func SoftModularUse(ctx context.Context) error {
 	//1参数校验 不符合的设置成默认数据 {
 	return nil
 }
 
-func softModularUseLog(ctx context.Context, args *service.Args, reply *service.Replies) error {
+func softModularUseLog(ctx context.Context) error {
 	//1参数校验 不符合的设置成默认数据 {
 	return nil
 }
