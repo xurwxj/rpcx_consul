@@ -8,7 +8,6 @@ import (
 
 	"github.com/smallnest/rpcx/log"
 	"github.com/soheilhy/cmux"
-	"github.com/xurwxj/gtils/base"
 )
 
 type CmuxConfigPlugin struct {
@@ -44,18 +43,6 @@ func (s *CmuxConfigPlugin) MuxMatch(m cmux.CMux) {
 			newValue, _ := base64.StdEncoding.DecodeString(v)
 			s.MergeConfigFunc(string(newValue))
 			s.Log.Debugf("consulConfigUpdate kvKey=%v  value=%v ", c[0].Key, string(newValue))
-		}
-		resByte, err := base.GetByteArrayFromInterface(map[string]interface{}{
-			"status": "UP",
-			"application": map[string]string{
-				"status": "UP",
-			},
-		})
-		if err == nil {
-			_, err = w.Write(resByte)
-			if err == nil {
-				return
-			}
 		}
 	})
 
