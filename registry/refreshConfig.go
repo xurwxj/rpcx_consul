@@ -1,22 +1,21 @@
 package registry
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	"os"
 
 	"github.com/smallnest/rpcx/log"
 	"github.com/soheilhy/cmux"
 	"github.com/xurwxj/gtils/base"
-	"github.com/xurwxj/viper"
 )
 
-type CmuxPluginConfig struct {
-	CmuxPlugin
-	Url string
+type CmuxConfigPlugin struct {
+	Log             log.Logger
+	URL             string
+	ConfigPath      string
+	MergeConfigFunc func(data string)
 }
 
 type ConsulKVRep struct {
@@ -24,7 +23,7 @@ type ConsulKVRep struct {
 	Value string `json:"Value"`
 }
 
-func (s *CmuxPluginConfig) MuxMatch(m cmux.CMux) {
+func (s *CmuxConfigPlugin) MuxMatch(m cmux.CMux) {
 	http1Matcher := cmux.HTTP1HeaderFieldPrefix("Consul-Update", "param")
 	http1aMatcher := cmux.HTTP1HeaderFieldPrefix("Consul-Update", "[\"param")
 	http2Matcher := cmux.HTTP2HeaderFieldPrefix("Consul-Update", "param")
@@ -32,10 +31,10 @@ func (s *CmuxPluginConfig) MuxMatch(m cmux.CMux) {
 
 	listener := m.Match(http1Matcher, http1aMatcher, http2Matcher, http2aMatcher)
 	mux := http.NewServeMux()
-	mux.HandleFunc(s.Url, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(s.URL, func(w http.ResponseWriter, r *http.Request) {
 		b, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			log.Errorf("consulConfigUpdate fail err =%v", err)
+			s.Log.Errorf("consulConfigUpdate fail err =%v", err)
 			return
 		}
 		c := make([]*ConsulKVRep, 0)
@@ -43,8 +42,8 @@ func (s *CmuxPluginConfig) MuxMatch(m cmux.CMux) {
 		if len(c) > 0 {
 			v := c[0].Value
 			newValue, _ := base64.StdEncoding.DecodeString(v)
-			MergeConfig(string(newValue))
-			log.Debugf("consulConfigUpdate kvKey=%v  value=%v ", c[0].Key, string(newValue))
+			s.MergeConfigFunc(string(newValue))
+			s.Log.Debugf("consulConfigUpdate kvKey=%v  value=%v ", c[0].Key, string(newValue))
 		}
 		resByte, err := base.GetByteArrayFromInterface(map[string]interface{}{
 			"status": "UP",
@@ -64,21 +63,4 @@ func (s *CmuxPluginConfig) MuxMatch(m cmux.CMux) {
 		Handler: mux,
 	}
 	go httpS.Serve(listener)
-}
-
-func MergeConfig(data string) {
-	if data == "" {
-		return
-	}
-	base.CheckPathExistOrCreate("nacos")
-	err := os.WriteFile("nacos/remote.json", []byte(data), os.ModePerm)
-	if err != nil {
-		log.Errorf("mergeConfig:WriteFile config=%v err=%v ", data, err)
-	}
-	err = viper.MergeConfig(bytes.NewReader([]byte(data)))
-	if err != nil {
-		log.Errorf("mergeConfig config=%v  err=%v ", data, err)
-	} else {
-		log.Infof("mergeConfig done success ")
-	}
 }

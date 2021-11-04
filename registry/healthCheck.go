@@ -9,13 +9,13 @@ import (
 )
 
 // CmuxPlugin rpcx CMuxMatch plugin implements
-type CmuxPlugin struct {
+type CmuxHealthCheckPlugin struct {
 	Log      log.Logger
 	Services *[]string
 }
 
 // MuxMatch main CMuxMatch func
-func (s *CmuxPlugin) MuxMatch(m cmux.CMux) {
+func (s *CmuxHealthCheckPlugin) MuxMatch(m cmux.CMux) {
 	http1Matcher := cmux.HTTP1HeaderFieldPrefix("Consul-Health-Check", "serviceCheck")
 	http1aMatcher := cmux.HTTP1HeaderFieldPrefix("Consul-Health-Check", "[\"serviceCheck")
 	http2Matcher := cmux.HTTP2HeaderFieldPrefix("Consul-Health-Check", "serviceCheck")
@@ -46,9 +46,4 @@ func (s *CmuxPlugin) MuxMatch(m cmux.CMux) {
 		Handler: mux,
 	}
 	go httpS.Serve(listener)
-	// go m.Serve()
-	// err := m.Serve()
-	// if err != nil {
-	// 	s.Log.Errorf("MuxMatch Serve err: ", err)
-	// }
 }
