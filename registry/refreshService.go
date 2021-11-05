@@ -1,7 +1,7 @@
 package registry
 
 import (
-	"fmt"
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 
@@ -15,6 +15,9 @@ type CmuxServicePlugin struct {
 	URL               string
 	RefreshServiceFun func(services map[string][]string)
 }
+type ServicesList struct {
+	Services map[string][]string
+}
 
 func (s *CmuxServicePlugin) MuxMatch(m cmux.CMux) {
 	http1Matcher := cmux.HTTP1HeaderFieldPrefix("Consul-Service", "services")
@@ -27,19 +30,19 @@ func (s *CmuxServicePlugin) MuxMatch(m cmux.CMux) {
 	mux.HandleFunc(s.URL, func(w http.ResponseWriter, r *http.Request) {
 		b, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			s.Log.Errorf("consulConfigUpdate fail err =%v", err)
+			s.Log.Errorf("consulServiceUpdate fail err =%v", err)
 			return
 		}
-		c := string(b)
-		fmt.Println("..", c)
-		// c := make([]*ConsulKVRep, 0)
-		// json.Unmarshal(b, &c)
-		// if len(c) > 0 {
-		// 	v := c[0].Value
-		// 	newValue, _ := base64.StdEncoding.DecodeString(v)
-		// 	s.RefreshServiceFun(string(newValue))
-		// 	s.Log.Debugf("consulConfigUpdate kvKey=%v  value=%v ", c[0].Key, string(newValue))
-		// }
+		services := make(map[string][]string)
+		if err := json.Unmarshal(b, &services); err != nil {
+			s.Log.Errorf("consulServiceUpdate fail err =%v", err)
+			return
+
+		}
+
+		services = dealServiceData(services)
+		s.Log.Debugf("consulServiceUpdate services=%v services=%v ", string(b), services)
+		s.RefreshServiceFun(services)
 		resByte, err := base.GetByteArrayFromInterface(map[string]interface{}{
 			"status": "UP",
 			"application": map[string]string{
@@ -58,4 +61,20 @@ func (s *CmuxServicePlugin) MuxMatch(m cmux.CMux) {
 		Handler: mux,
 	}
 	go httpS.Serve(listener)
+}
+
+func dealServiceData(serviceMap map[string][]string) map[string][]string {
+	newServiceMap := make(map[string][]string)
+	for key, nodes := range serviceMap {
+		for _, node := range nodes {
+			if services, ok := newServiceMap[node]; ok {
+				services = append(services, key)
+				newServiceMap[node] = services
+				continue
+			}
+			newServiceMap[node] = []string{key}
+
+		}
+	}
+	return newServiceMap
 }
